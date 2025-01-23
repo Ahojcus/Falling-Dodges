@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Falling Game</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+        }
+
+        canvas {
+            display: block;
+            background: linear-gradient(to bottom, #4facfe, #00f2fe);
+        }
+
+        #restartButton, #pauseButton {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            padding: 10px;
+            font-size: 20px;
+            background-color: #4caf50;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            z-index: 10;
+        }
+
+        #pauseButton {
+            top: 60px;
+        }
+
+        #restartButton {
+            display: none;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+        }
+
+        #restartButton:hover, #pauseButton:hover {
+            background-color: #45a049;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="gameCanvas"></canvas>
+    <button id="restartButton">Hrát znovu</button>
+    <button id="pauseButton">Pause</button>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const restartButton = document.getElementById('restartButton');
+        const pauseButton = document.getElementById('pauseButton');
+
+        let player = {
+            x: canvas.width / 2,
+            y: canvas.height / 2,
+            radius: 20,
+            color: 'gray',
+            speed: 3,
+            moveDirection: null
+        };
+
+        let spikes = [];
+        let isGameOver = false;
+        let score = 0;
+        let spikeSpeed = 1;
+        let playerSpeed = 3;
+        let isPaused = false;
+
+        let lastSpikeTime = 0;
+        let spikeInterval = 2000;
+
+        function resizeCanvas() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        }
+
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
+
+        function drawPlayer() {
+            ctx.beginPath();
+            ctx.arc(player.x, player.y, player.radius, 0, Math.PI * 2);
+            ctx.fillStyle = player.color;
+            ctx.fill();
+            ctx.closePath();
+        }
+
+        function createSpike(x, y, side) {
+            const spike = {
+                x: x,
+                y: y,
+                width: canvas.width / 30,
+                height: canvas.height / 20,
+                side: side
+            };
+            spikes.push(spike);
+        }
+
+        function drawSpikes() {
+            spikes.forEach(spike => {
+                ctx.beginPath();
+                if (spike.side === 'left') {
+                    ctx.moveTo(spike.x, spike.y);
+                    ctx.lineTo(spike.x + spike.width, spike.y + spike.height / 2);
+                    ctx.lineTo(spike.x, spike.y + spike.height);
+                } else if (spike.side === 'right') {
+                    ctx.moveTo(spike.x, spike.y);
+                    ctx.lineTo(spike.x - spike.width, spike.y + spike.height / 2);
+                    ctx.lineTo(spike.x, spike.y + spike.height);
+                } else {
+                    ctx.moveTo(spike.x, spike.y);
+                    ctx.lineTo(spike.x + spike.width / 2, spike.y + spike.height / 2);
+                    ctx.lineTo(spike.x, spike.y + spike.height);
+                }
+                ctx.closePath();
+                ctx.fillStyle = 'black';
+                ctx.fill();
+            });
+        }
+
+        function generateSpikes() {
+            let currentTime = Date.now();
+            if (currentTime - lastSpikeTime > spikeInterval) {
+                const side = Math.random() < 0.5 ? 'left' : 'right';
+                const y = canvas.height;
+                createSpike(side === 'left' ? 0 : canvas.width, y, side);
+                lastSpikeTime = currentTime;
+
+                if (score >= 1000) {
+                    if (Math.random() < 0.00000025) {
+                        createSpike(canvas.width / 2, y, 'center');
+                    }
+                }
+            }
+        }
+
+        function detectCollision() {
+            spikes.forEach(spike => {
+                if (spike.side === 'left' || spike.side === 'right') {
+                    if (
+                        (player.x - player.radius < spike.x + spike.width && player.x + player.radius > spike.x && player.y > spike.y && player.y < spike.y + spike.height) ||
+                        (player.x + player.radius > spike.x - spike.width && player.x - player.radius < spike.x && player.y > spike.y && player.y < spike.y + spike.height)
+                    ) {
+                        isGameOver = true;
+                    }
+                } else {
+                    if (
+                        player.x > spike.x - spike.width / 2 &&
+                        player.x < spike.x + spike.width / 2 &&
+                        player.y > spike.y &&
+                        player.y < spike.y + spike.height
+                    ) {
+                        isGameOver = true;
+                    }
+                }
+            });
+        }
+
+        function changeBackground() {
+            if (score % 5000 === 0) {
+                const newColor = `hsl(${Math.random() * 360}, 100%, 80%)`;
+                document.body.style.background = newColor;
+            }
+        }
+
+        function updateGame() {
+            if (isPaused) return;
+
+            if (isGameOver) {
+                restartButton.style.display = 'block';  // Ukáže tlačítko pro restart hry
+                return;
+            }
+
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            spikes.forEach(spike => {
+                spike.y -= spikeSpeed;
+            });
+
+            generateSpikes();
+
+            if (player.moveDirection === 'left' && player.x > player.radius) {
+                player.x -= playerSpeed;
+            } else if (player.moveDirection === 'right' && player.x < canvas.width - player.radius) {
+                player.x += playerSpeed;
+            }
+
+            drawPlayer();
+            drawSpikes();
+            detectCollision();
+
+            score++;
+            ctx.font = '24px Arial';
+            ctx.fillStyle = 'black';
+            ctx.fillText('Score: ' + score, 10, 30);
+
+            changeBackground();
+
+            // Změna rychlosti podle skóre:
+            spikeSpeed = 1 + score / 2000; // Zrychluje generování ostnů
+            spikeInterval = Math.max(1000, 2000 - score / 100); // Zkracuje interval generování ostnů
+            playerSpeed = 3 + score / 500; // Zrychluje pohyb kuličky
+
+            requestAnimationFrame(updateGame);
+        }
+
+        window.addEventListener('mousedown', () => {
+            if (isGameOver) {
+                // Restart hry při kliknutí na myš
+                restartGame();
+            } else {
+                // Změna směru pohybu kuličky při kliknutí
+                if (player.moveDirection === 'left') {
+                    player.moveDirection = 'right';
+                } else {
+                    player.moveDirection = 'left';
+                }
+            }
+        });
+
+        window.addEventListener('keydown', (event) => {
+            if (event.key === ' ') {
+                if (player.x < canvas.width / 2) {
+                    player.moveDirection = 'right';
+                } else {
+                    player.moveDirection = 'left';
+                }
+            }
+        });
+
+        pauseButton.addEventListener('click', () => {
+            isPaused = !isPaused;
+            if (isPaused) {
+                pauseButton.textContent = 'Resume';
+            } else {
+                pauseButton.textContent = 'Pause';
+                updateGame();  // Continue game after resuming
+            }
+        });
+
+        restartButton.addEventListener('click', restartGame);
+
+        // Funkce pro restartování hry
+        function restartGame() {
+            isGameOver = false;
+            player.x = canvas.width / 2;
+            player.y = canvas.height / 2;
+            spikes = [];
+            score = 0;
+            restartButton.style.display = 'none';  // Skrytí tlačítka pro restart
+            updateGame();  // Znovu spustí hru
+        }
+
+        updateGame();
+    </script>
+</body>
+</html>
